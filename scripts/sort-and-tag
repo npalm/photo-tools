@@ -1,0 +1,116 @@
+#!/bin/bash
+
+installUbuntuSoftware() {
+        nameCommand=$1
+        namePackage=$2
+
+        AVAILABLE=`which ${nameCommand}`
+        if [ -z ${AVAILABLE} ]; then
+          echo Installing $2
+          sudo apt-get -y install ${namePackage}
+          AVAILABLE=`which ${nameCommand}`
+          if [ ! -x ${AVAILABLE} ]; then
+            exit 1
+          fi
+        fi
+}
+
+deleteFile() {
+	if [ -f $1 ]
+	then
+		rm $1
+	fi
+}
+
+count_extension () (
+  ext="$1"
+  dir="$2"
+  any=false
+  count=`find $dir -maxdepth 1 -type f -iname "*.$ext" |wc -l`
+  echo $count
+)
+
+any_with_extension() {
+  count=`count_extension $1 $2`
+  if [[ $count == 0 ]]
+    then
+      any=false
+    else
+      any=true
+  fi
+  echo $any
+}
+
+rename() {
+	PHOTO_DIR=$1
+	COUNT=`ls -1 ${PHOTO_DIR}|wc -l`
+	TAGS=`echo $@ | sed -e 's/[^\ ]*\ //'`
+	TAGS=`echo $TAGS | sed -e 's/_/\ /'`
+	TITLE=`echo $TAGS | sed -e 's/[^\ ]*\ //g'`
+	echo "   Step 1: Temporary renaming pictures"
+	SEQ=${#COUNT}
+	exiftool -m -d %Y%m%d_%H%M%S_%%.${SEQ}c.%%e '-FileName<$CreateDate' ${PHOTO_DIR} > /dev/null
+
+	#delete old files.txt
+	deleteFile files.txt
+
+	for foto in `find ${PHOTO_DIR} -maxdepth 1 -type f -iname "*.JPG" | sort`
+	do
+	  echo ${foto} >> files.txt
+	done
+
+
+	if [ -f files.txt ]
+	then
+	  echo "   Step 2: Renaming pictures to final name - "
+	  echo "           format: <date>_"${TITLE}"_<sequence> "
+	  exiftool -m -d %Y-%m-%d_${TITLE}_%%.${SEQ}nC.%%e '-FileName<$CreateDate' -@ files.txt > /dev/null
+
+	  first=true
+
+#	  tagline1=`echo $tag | sed -e 's/[^\ ]+[\ ]/-xmp-dc:Subject=\"/g' `
+#	  tagline1=`echo $tag | sed -e 's/\([^\ ]*\)\([\ ]\)/\1/g'`
+#
+#	  for tag in ${TAGS}
+#	  do
+#	  tag=`echo $tag | sed -e 's/[-]/\ /'`
+#	  tagline1="${tagline1} -xmp-dc:Subject=\"${tag}\""
+#	  tagline2="${tagline2} -keywords=\"${tag}\""
+#
+#	  done
+#	  echo tagln1 $tagline1
+#	  echo tagln2 $tagline2
+#
+#exiftool -overwrite_original "${tagline1}" "${tagline2}" ${PHOTO_DIR}
+#exit 1
+	  echo "   Step 3: Tagging "
+	  for tag in ${TAGS}
+	  do
+	    tag=`echo $tag | sed -e 's/[-]/\ /g'`
+	    if $first
+	    then
+	    echo "           Adding TAG: "$tag""
+	      first=false
+	      exiftool -m -overwrite_original -xmp-dc:Subject="${tag}" -keywords="${tag}" ${copyright} ${PHOTO_DIR} > /dev/null
+	    else
+	    echo "           Adding TAG: "$tag""
+	      exiftool -m -overwrite_original -xmp-dc:Subject+="${tag}" -keywords+="${tag}" ${PHOTO_DIR} > /dev/null
+	    fi
+	  done
+	  deleteFile files.txt
+	fi
+}
+
+
+# Check dialog is availble for using menus
+installUbuntuSoftware exiftool libimage-exiftool-perl
+installUbuntuSoftware jhead jhead
+
+
+if [[ `any_with_extension JPG $1` ]]
+then
+  rename $@
+  jhead -ft -c -q $1/*.JPG > /dev/null
+else
+  echo No pictures to process in $1
+fi
