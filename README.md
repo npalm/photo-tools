@@ -5,8 +5,13 @@ Sort, rename and tag all the photos in a certain directory. Photo will be format
 
 
 Usages:
-- TAGS: List of tags seprated by blank, latest tag will be added as name in the name of the file.
+- TAGS: List of tags separated by blank, latest tag will be added as name in the name of the file.
+  - Separated by blank
+  - `-` will replaced by a blank in the tag.
+  - Last tag is used as name in the filename.
 
+example:
 ```
-docker run -i -i --rm -v <path to photo dir>:/data npalm/photo-tools sort-and-tag . <TAGS>
+docker run -it --rm -v <path to photo dir>:/data npalm/photo-tools
+  sort-and-tag -d . -a "me" -c "me 2018" -t "TAGS"
 ```

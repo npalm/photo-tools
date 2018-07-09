@@ -15,6 +15,14 @@ installUbuntuSoftware() {
         fi
 }
 
+usage() {
+	printf "Usage: \n"
+	printf "  -d <directory name> Directory containing the photo's \n"
+	printf "  -a <artist name> Artist name that will be added to the EXIF info. \n"
+	printf "  -c <copyright> Copyright that will be added to the EXIF info. \n"
+	printf "  -t <tags> Tags that will be added as subject and keyword to the EXIF info. \n"
+}
+
 deleteFile() {
 	if [ -f $1 ]
 	then
@@ -42,11 +50,14 @@ any_with_extension() {
 }
 
 rename() {
-	PHOTO_DIR=$1
+
 	COUNT=`ls -1 ${PHOTO_DIR}|wc -l`
-	TAGS=`echo $@ | sed -e 's/[^\ ]*\ //'`
-	TAGS=`echo $TAGS | sed -e 's/_/\ /'`
+	TAGS=`echo $TAGS | sed -e 's/[^\ ]*\ //'`
 	TITLE=`echo $TAGS | sed -e 's/[^\ ]*\ //g'`
+
+echo tags rename: $TAGS
+echo title $TITLE
+
 	echo "   Step 1: Temporary renaming pictures"
 	SEQ=${#COUNT}
 	exiftool -m -d %Y%m%d_%H%M%S_%%.${SEQ}c.%%e '-FileName<$CreateDate' ${PHOTO_DIR} > /dev/null
@@ -68,21 +79,6 @@ rename() {
 
 	  first=true
 
-#	  tagline1=`echo $tag | sed -e 's/[^\ ]+[\ ]/-xmp-dc:Subject=\"/g' `
-#	  tagline1=`echo $tag | sed -e 's/\([^\ ]*\)\([\ ]\)/\1/g'`
-#
-#	  for tag in ${TAGS}
-#	  do
-#	  tag=`echo $tag | sed -e 's/[-]/\ /'`
-#	  tagline1="${tagline1} -xmp-dc:Subject=\"${tag}\""
-#	  tagline2="${tagline2} -keywords=\"${tag}\""
-#
-#	  done
-#	  echo tagln1 $tagline1
-#	  echo tagln2 $tagline2
-#
-#exiftool -overwrite_original "${tagline1}" "${tagline2}" ${PHOTO_DIR}
-#exit 1
 	  echo "   Step 3: Tagging "
 	  for tag in ${TAGS}
 	  do
@@ -91,7 +87,7 @@ rename() {
 	    then
 	    echo "           Adding TAG: "$tag""
 	      first=false
-	      exiftool -m -overwrite_original -xmp-dc:Subject="${tag}" -keywords="${tag}" ${copyright} ${PHOTO_DIR} > /dev/null
+	      exiftool -m -artist="${ARTIST}" -copyright="${COPYRIGHT}" -overwrite_original -xmp-dc:Subject="${tag}" -keywords="${tag}" ${PHOTO_DIR} > /dev/null
 	    else
 	    echo "           Adding TAG: "$tag""
 	      exiftool -m -overwrite_original -xmp-dc:Subject+="${tag}" -keywords+="${tag}" ${PHOTO_DIR} > /dev/null
@@ -102,15 +98,41 @@ rename() {
 }
 
 
+while getopts ":d:c:a:t:h" opt; do
+  case $opt in
+    d)
+      export PHOTO_DIR=${OPTARG:-"."}
+      ;;
+    c)
+      export COPYRIGHT=${OPTARG}
+      ;;
+    a)
+      export ARTIST=${OPTARG}
+      ;;
+    t)
+      export TAGS=${OPTARG:-${VERSION}}
+      ;;
+    h)
+      usage
+      exit 1
+      ;;
+  esac
+done
+shift $((OPTIND-1))
+
 # Check dialog is availble for using menus
+echo tags: $TAGS
+echo artist: $ARTIST
+echo copyright: $COPYRIGHT
+echo dir: $PHOTO_DIR
+
 installUbuntuSoftware exiftool libimage-exiftool-perl
 installUbuntuSoftware jhead jhead
 
-
-if [[ `any_with_extension JPG $1` ]]
+if [[ `any_with_extension JPG $PHOTO_DIR` && ! -z ${TAGS} ]]
 then
-  rename $@
-  jhead -ft -c -q $1/*.JPG > /dev/null
+  rename
+  jhead -ft -c -q $PHOTO_DIR/*.JPG > /dev/null
 else
-  echo No pictures to process in $1
+  usage
 fi
